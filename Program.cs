@@ -49,19 +49,24 @@ async Task DownloadPage(string URL, string downloadFolderPath, HttpClient httpCl
 
     // Create a subdirectory based on the relative path of the URL
     string relativePath = new Uri(rootURL).MakeRelativeUri(new Uri(URL)).ToString();
-    string subdirectory = Path.Combine(downloadFolderPath, relativePath);
-    Directory.CreateDirectory(subdirectory);
+    string filepath =Path.Combine(downloadFolderPath, relativePath);
+    string? fileDirectory = Path.GetDirectoryName(filepath);
+    if (fileDirectory is not null)
+        Directory.CreateDirectory(fileDirectory);
+    else
+        return;
+    Directory.CreateDirectory(fileDirectory);
     // Write HTML file to disk
-    string htmlFileName = Path.Combine(subdirectory, Path.GetFileName(URL));
+    string htmlFileName = Path.Combine(fileDirectory, Path.GetFileName(URL));
     File.WriteAllText(htmlFileName, htmlContent);
 
     //Download images and other static files
-    await DownloadResources(URL, htmlDocument, subdirectory, httpClient, "//img[@src]");
-    await DownloadResources(URL, htmlDocument, subdirectory, httpClient, "//head/link[@rel='stylesheet' or @rel='icon']/@href");
-    await DownloadResources(URL, htmlDocument, subdirectory, httpClient, "//script[@src]/@src");
+    await DownloadResources(URL, htmlDocument, fileDirectory, httpClient, "//img[@src]");
+    await DownloadResources(URL, htmlDocument, fileDirectory, httpClient, "//link[@rel='stylesheet' or @rel='icon']/@href");
+    await DownloadResources(URL, htmlDocument, fileDirectory, httpClient, "//script[@src]/@src");
 
-   // Find and follow links to other pages
-   var linkNodes = htmlDocument.DocumentNode.SelectNodes("//a[@href]");
+    // Find and follow links to other pages
+    var linkNodes = htmlDocument.DocumentNode.SelectNodes("//a[@href]");
     if (linkNodes != null)
     {
         foreach (var linkNode in linkNodes)
@@ -99,6 +104,7 @@ async Task DownloadResources(string url, HtmlDocument htmlDocument, string downl
     {
         foreach (var resourceNode in resourceNodes)
         {
+            //src if not href
             string resourceUrl = resourceNode.GetAttributeValue("href", resourceNode.GetAttributeValue("src", ""));
             if (Uri.TryCreate(resourceUrl, UriKind.Absolute, out Uri? absoluteUri))
             {
@@ -119,8 +125,12 @@ async Task DownloadResources(string url, HtmlDocument htmlDocument, string downl
 
                 string resourceRelativePath = new Uri(rootURL).MakeRelativeUri(new Uri(resourceUrl)).ToString();
                 string resourceCombinedPath = Path.Combine(downloadFolderPath, resourceRelativePath);
-                Directory.CreateDirectory(resourceCombinedPath);
-                string resourceFileName = Path.Combine(resourceCombinedPath, Path.GetFileName(resourceUrl));
+                string? resourceDirectory = Path.GetDirectoryName(resourceCombinedPath);
+                if (resourceDirectory is not null)
+                    Directory.CreateDirectory(resourceDirectory);
+                else
+                    continue;
+                string resourceFileName = Path.Combine(resourceDirectory, Path.GetFileName(resourceUrl));
 
                 byte[] resourceData = await httpClient.GetByteArrayAsync(resourceUrl);
                 File.WriteAllBytes(resourceFileName, resourceData);
