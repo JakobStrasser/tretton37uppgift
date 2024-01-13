@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
@@ -9,20 +10,49 @@ using HtmlAgilityPack;
 string rootURL = @"http://books.toscrape.com/index.html";
 Uri rootUri = new Uri(rootURL);
 string downloadFolderPath = @"C:\temp\bookstoscrapecom\";
-List<string> downloadedURLs = new List<string>();
+BlockingCollection<string> downloadedURLs = new BlockingCollection<string>();
+int maxThreads = 3;
 int Count = 0;
+BlockingCollection<string> pageQueue = new BlockingCollection<string>();
 
 Directory.CreateDirectory(downloadFolderPath);
 
-using HttpClient httpClient = new HttpClient();
-
 Console.WriteLine($"Downloading {rootURL} to {downloadFolderPath}");
 
-await DownloadPage(rootURL, downloadFolderPath, httpClient, downloadedURLs);
+using HttpClient httpClient = new HttpClient();
 
-Console.WriteLine($"Download {Count} pages.");
+List<Task> downloadTasks = new List<Task>();
 
-async Task DownloadPage(string URL, string downloadFolderPath, HttpClient httpClient, List<string> downloadedURLs)
+for (int i = 0; i < maxThreads; i++)
+{
+    downloadTasks.Add(Task.Run(async () =>
+    {
+        while (!pageQueue.IsCompleted)
+        {
+            try
+            {
+                string url = pageQueue.Take();
+
+                await DownloadPage(url, downloadFolderPath, httpClient);
+            }
+            catch (InvalidOperationException)
+            {
+                // Done
+                return;
+            }
+        }
+    }));
+}
+
+await DownloadPage(rootURL, downloadFolderPath, httpClient);
+
+pageQueue.CompleteAdding();
+
+await Task.WhenAll(downloadTasks);
+
+Console.WriteLine($"Download a total of {Count} pages.");
+
+async Task DownloadPage(string URL, string downloadFolderPath, HttpClient httpClient)
 {
     //Base case
     if (downloadedURLs.Contains(URL))
@@ -32,7 +62,7 @@ async Task DownloadPage(string URL, string downloadFolderPath, HttpClient httpCl
     else
     {
         downloadedURLs.Add(URL);
-        Count++;
+        Interlocked.Increment(ref Count);
         Console.Write($"\rDownloaded {Count} files.");
     }
 
@@ -49,7 +79,7 @@ async Task DownloadPage(string URL, string downloadFolderPath, HttpClient httpCl
 
     // Create a subdirectory based on the relative path of the URL
     string relativePath = new Uri(rootURL).MakeRelativeUri(new Uri(URL)).ToString();
-    string filepath =Path.Combine(downloadFolderPath, relativePath);
+    string filepath = Path.Combine(downloadFolderPath, relativePath);
     string? fileDirectory = Path.GetDirectoryName(filepath);
     if (fileDirectory is not null)
         Directory.CreateDirectory(fileDirectory);
@@ -91,7 +121,8 @@ async Task DownloadPage(string URL, string downloadFolderPath, HttpClient httpCl
             }
             else
             {
-                await DownloadPage(nextUrl, downloadFolderPath, httpClient, downloadedURLs);
+                pageQueue.Add(nextUrl);
+                //await DownloadPage(nextUrl, downloadFolderPath, httpClient, downloadedURLs);
             }
         }
     }
@@ -135,7 +166,7 @@ async Task DownloadResources(string url, HtmlDocument htmlDocument, string downl
                 byte[] resourceData = await httpClient.GetByteArrayAsync(resourceUrl);
                 File.WriteAllBytes(resourceFileName, resourceData);
                 downloadedURLs.Add(resourceUrl);
-                Count++;
+                Interlocked.Increment(ref Count);
             }
         }
     }
