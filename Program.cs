@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
 
@@ -11,9 +12,11 @@ string rootURL = @"http://books.toscrape.com/index.html";
 Uri rootUri = new Uri(rootURL);
 string downloadFolderPath = @"C:\temp\bookstoscrapecom\";
 BlockingCollection<string> downloadedURLs = new BlockingCollection<string>();
-int maxThreads = 3;
+
 int Count = 0;
 BlockingCollection<string> pageQueue = new BlockingCollection<string>();
+object lockingObject = new object();
+
 
 Directory.CreateDirectory(downloadFolderPath);
 
@@ -21,38 +24,13 @@ Console.WriteLine($"Downloading {rootURL} to {downloadFolderPath}");
 
 using HttpClient httpClient = new HttpClient();
 
-List<Task> downloadTasks = new List<Task>();
-
-for (int i = 0; i < maxThreads; i++)
-{
-    downloadTasks.Add(Task.Run(async () =>
-    {
-        while (!pageQueue.IsCompleted)
-        {
-            try
-            {
-                string url = pageQueue.Take();
-
-                await DownloadPage(url, downloadFolderPath, httpClient);
-            }
-            catch (InvalidOperationException)
-            {
-                // Done
-                return;
-            }
-        }
-    }));
-}
-
-await DownloadPage(rootURL, downloadFolderPath, httpClient);
-
-pageQueue.CompleteAdding();
-
-await Task.WhenAll(downloadTasks);
+await DownloadPage(rootURL, httpClient);
 
 Console.WriteLine($"Download a total of {Count} pages.");
 
-async Task DownloadPage(string URL, string downloadFolderPath, HttpClient httpClient)
+Console.ReadLine();
+
+async Task DownloadPage(string URL, HttpClient httpClient)
 {
     //Base case
     if (downloadedURLs.Contains(URL))
@@ -88,17 +66,24 @@ async Task DownloadPage(string URL, string downloadFolderPath, HttpClient httpCl
     Directory.CreateDirectory(fileDirectory);
     // Write HTML file to disk
     string htmlFileName = Path.Combine(fileDirectory, Path.GetFileName(URL));
-    File.WriteAllText(htmlFileName, htmlContent);
-
+    lock (lockingObject)
+    {
+        using (var f = new FileStream(htmlFileName, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None))
+        {
+            f.Write(new UTF8Encoding().GetBytes(htmlContent));
+        }
+    }
     //Download images and other static files
-    await DownloadResources(URL, htmlDocument, fileDirectory, httpClient, "//img[@src]");
-    await DownloadResources(URL, htmlDocument, fileDirectory, httpClient, "//link[@rel='stylesheet' or @rel='icon']/@href");
-    await DownloadResources(URL, htmlDocument, fileDirectory, httpClient, "//script[@src]/@src");
+    await DownloadResources(URL, htmlDocument, httpClient, "//img[@src]");
+    await DownloadResources(URL, htmlDocument, httpClient, "//link[@rel='stylesheet' or @rel='icon']/@href");
+    await DownloadResources(URL, htmlDocument, httpClient, "//script[@src]/@src");
 
     // Find and follow links to other pages
     var linkNodes = htmlDocument.DocumentNode.SelectNodes("//a[@href]");
+   
     if (linkNodes != null)
     {
+        List<Task> links = new List<Task>();
         foreach (var linkNode in linkNodes)
         {
             string nextUrl = linkNode.Attributes["href"].Value;
@@ -106,6 +91,9 @@ async Task DownloadPage(string URL, string downloadFolderPath, HttpClient httpCl
             // Check if the link is an absolute URL or a relative path
             if (Uri.TryCreate(nextUrl, UriKind.Absolute, out Uri? absoluteUri))
             {
+                //No external links
+                if (absoluteUri.Host != rootUri.Host)
+                    continue;
                 // If it's an absolute URL, use it as is
                 nextUrl = absoluteUri.ToString();
             }
@@ -121,14 +109,16 @@ async Task DownloadPage(string URL, string downloadFolderPath, HttpClient httpCl
             }
             else
             {
-                pageQueue.Add(nextUrl);
-                //await DownloadPage(nextUrl, downloadFolderPath, httpClient, downloadedURLs);
+               links.Add(Task.Run(() => DownloadPage(nextUrl, httpClient)));
             }
         }
+
+        await Task.WhenAll(links);
+        
     }
 }
 
-async Task DownloadResources(string url, HtmlDocument htmlDocument, string downloadFolderPath, HttpClient httpClient, string xpath)
+async Task DownloadResources(string url, HtmlDocument htmlDocument, HttpClient httpClient, string xpath)
 {
     var resourceNodes = htmlDocument.DocumentNode.SelectNodes(xpath);
     if (resourceNodes != null)
@@ -164,7 +154,13 @@ async Task DownloadResources(string url, HtmlDocument htmlDocument, string downl
                 string resourceFileName = Path.Combine(resourceDirectory, Path.GetFileName(resourceUrl));
 
                 byte[] resourceData = await httpClient.GetByteArrayAsync(resourceUrl);
-                File.WriteAllBytes(resourceFileName, resourceData);
+                lock (lockingObject)
+                {
+                    using (var f = new FileStream(resourceFileName, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None))
+                    {
+                        f.Write(resourceData);
+                    }
+                }
                 downloadedURLs.Add(resourceUrl);
                 Interlocked.Increment(ref Count);
             }
