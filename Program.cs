@@ -7,6 +7,7 @@ using HtmlAgilityPack;
 
 
 string rootURL = @"http://books.toscrape.com/index.html";
+Uri rootUri = new Uri(rootURL);
 string downloadFolderPath = @"C:\temp\bookstoscrapecom\";
 List<string> downloadedURLs = new List<string>();
 int Count = 0;
@@ -43,6 +44,9 @@ async Task DownloadPage(string URL, string downloadFolderPath, HttpClient httpCl
     HtmlDocument htmlDocument = new HtmlDocument();
     htmlDocument.LoadHtml(htmlContent);
 
+    if (htmlDocument is null)
+        return;
+
     // Create a subdirectory based on the relative path of the URL
     string relativePath = new Uri(rootURL).MakeRelativeUri(new Uri(URL)).ToString();
     string subdirectory = Path.Combine(downloadFolderPath, relativePath);
@@ -52,13 +56,12 @@ async Task DownloadPage(string URL, string downloadFolderPath, HttpClient httpCl
     File.WriteAllText(htmlFileName, htmlContent);
 
     //Download images and other static files
-    if (htmlDocument is not null) {
-        await DownloadResources(URL, htmlDocument, subdirectory, httpClient, "//img[@src]");
-        await DownloadResources(URL, htmlDocument, subdirectory, httpClient, "//head/link[@rel='stylesheet' or @rel='icon']/@href | //head/script[@src]/@src");
-    }
+    await DownloadResources(URL, htmlDocument, subdirectory, httpClient, "//img[@src]");
+    await DownloadResources(URL, htmlDocument, subdirectory, httpClient, "//head/link[@rel='stylesheet' or @rel='icon']/@href");
+    await DownloadResources(URL, htmlDocument, subdirectory, httpClient, "//script[@src]/@src");
 
-    // Find and follow links to other pages
-    var linkNodes = htmlDocument.DocumentNode.SelectNodes("//a[@href]");
+   // Find and follow links to other pages
+   var linkNodes = htmlDocument.DocumentNode.SelectNodes("//a[@href]");
     if (linkNodes != null)
     {
         foreach (var linkNode in linkNodes)
@@ -99,6 +102,9 @@ async Task DownloadResources(string url, HtmlDocument htmlDocument, string downl
             string resourceUrl = resourceNode.GetAttributeValue("href", resourceNode.GetAttributeValue("src", ""));
             if (Uri.TryCreate(resourceUrl, UriKind.Absolute, out Uri? absoluteUri))
             {
+                //Don't download external files
+                if (absoluteUri.Host != rootUri.Host)
+                    continue;
                 // If it's an absolute URL, use it as is
                 resourceUrl = absoluteUri.ToString();
             }
