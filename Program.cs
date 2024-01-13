@@ -17,11 +17,11 @@ using HttpClient httpClient = new HttpClient();
 
 Console.WriteLine($"Downloading {rootURL} to {downloadFolderPath}");
 
-await downloadPage(rootURL, downloadFolderPath, httpClient, downloadedURLs);
+await DownloadPage(rootURL, downloadFolderPath, httpClient, downloadedURLs);
 
 Console.WriteLine($"Download {Count} pages.");
 
-async Task downloadPage(string URL, string downloadFolderPath, HttpClient httpClient, List<string> downloadedURLs)
+async Task DownloadPage(string URL, string downloadFolderPath, HttpClient httpClient, List<string> downloadedURLs)
 {
     //Base case
     if (downloadedURLs.Contains(URL))
@@ -32,7 +32,7 @@ async Task downloadPage(string URL, string downloadFolderPath, HttpClient httpCl
     {
         downloadedURLs.Add(URL);
         Count++;
-        Console.Write($"\rDownloaded {Count} pages.");
+        Console.Write($"\rDownloaded {Count} files.");
     }
 
     //Recursion
@@ -44,12 +44,18 @@ async Task downloadPage(string URL, string downloadFolderPath, HttpClient httpCl
     htmlDocument.LoadHtml(htmlContent);
 
     // Create a subdirectory based on the relative path of the URL
-    string relativePath = new Uri(rootURL).MakeRelativeUri(new Uri(URL)).ToString()
+    string relativePath = new Uri(rootURL).MakeRelativeUri(new Uri(URL)).ToString();
     string subdirectory = Path.Combine(downloadFolderPath, relativePath);
     Directory.CreateDirectory(subdirectory);
     // Write HTML file to disk
     string htmlFileName = Path.Combine(subdirectory, Path.GetFileName(URL));
     File.WriteAllText(htmlFileName, htmlContent);
+
+    //Download images and other static files
+    if (htmlDocument is not null) {
+        await DownloadResources(URL, htmlDocument, subdirectory, httpClient, "//img[@src]");
+        await DownloadResources(URL, htmlDocument, subdirectory, httpClient, "//head/link[@rel='stylesheet' or @rel='icon']/@href | //head/script[@src]/@src");
+    }
 
     // Find and follow links to other pages
     var linkNodes = htmlDocument.DocumentNode.SelectNodes("//a[@href]");
@@ -77,7 +83,43 @@ async Task downloadPage(string URL, string downloadFolderPath, HttpClient httpCl
             }
             else
             {
-                await downloadPage(nextUrl, downloadFolderPath, httpClient, downloadedURLs);
+                await DownloadPage(nextUrl, downloadFolderPath, httpClient, downloadedURLs);
+            }
+        }
+    }
+}
+
+async Task DownloadResources(string url, HtmlDocument htmlDocument, string downloadFolderPath, HttpClient httpClient, string xpath)
+{
+    var resourceNodes = htmlDocument.DocumentNode.SelectNodes(xpath);
+    if (resourceNodes != null)
+    {
+        foreach (var resourceNode in resourceNodes)
+        {
+            string resourceUrl = resourceNode.GetAttributeValue("href", resourceNode.GetAttributeValue("src", ""));
+            if (Uri.TryCreate(resourceUrl, UriKind.Absolute, out Uri? absoluteUri))
+            {
+                // If it's an absolute URL, use it as is
+                resourceUrl = absoluteUri.ToString();
+            }
+            else
+            {
+                // If it's a relative path, combine it with the base URL
+                resourceUrl = new Uri(new Uri(url), resourceUrl).ToString();
+            }
+            if (downloadedURLs.Contains(resourceUrl)) continue;
+            else
+            {
+
+                string resourceRelativePath = new Uri(rootURL).MakeRelativeUri(new Uri(resourceUrl)).ToString();
+                string resourceCombinedPath = Path.Combine(downloadFolderPath, resourceRelativePath);
+                Directory.CreateDirectory(resourceCombinedPath);
+                string resourceFileName = Path.Combine(resourceCombinedPath, Path.GetFileName(resourceUrl));
+
+                byte[] resourceData = await httpClient.GetByteArrayAsync(resourceUrl);
+                File.WriteAllBytes(resourceFileName, resourceData);
+                downloadedURLs.Add(resourceUrl);
+                Count++;
             }
         }
     }
