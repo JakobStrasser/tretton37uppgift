@@ -84,9 +84,9 @@ namespace tretton37uppgift
                 }
             }
             //Download images and other static files
-            await DownloadResources(URL, htmlDocument, httpClient, "//img[@src]");
-            await DownloadResources(URL, htmlDocument, httpClient, "//link[@rel='stylesheet' or @rel='icon']/@href");
-            await DownloadResources(URL, htmlDocument, httpClient, "//script[@src]/@src");
+            DownloadResources(URL, htmlDocument, httpClient, "//img[@src]");
+            DownloadResources(URL, htmlDocument, httpClient, "//link[@rel='stylesheet' or @rel='icon']/@href");
+            DownloadResources(URL, htmlDocument, httpClient, "//script[@src]/@src");
 
             // Find and follow links to other pages
             var linkNodes = htmlDocument.DocumentNode.SelectNodes("//a[@href]");
@@ -128,7 +128,7 @@ namespace tretton37uppgift
             }
         }
 
-        private async Task DownloadResources(string url, HtmlDocument htmlDocument, HttpClient httpClient, string xpath)
+        private void DownloadResources(string url, HtmlDocument htmlDocument, HttpClient httpClient, string xpath)
         {
             var resourceNodes = htmlDocument.DocumentNode.SelectNodes(xpath);
             if (resourceNodes != null)
@@ -201,9 +201,10 @@ namespace tretton37uppgift
                     Console.WriteLine($"Error when downloading {resourceUrl} on attempt {tries} of {maxtries}."); 
                 }
             }
-            throw new DownloadFailedException(5, new Exception($"Failed after reaching retry limit of {maxtries}."));
+            throw new DownloadFailedException(tries, new Exception($"Failed after reaching retry limit of {maxtries}."));
 
         }
+
 
     }
 }

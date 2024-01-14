@@ -46,7 +46,7 @@ namespace tretton37uppgift
             //arrange
             var expectedresult = new Byte[1];
             var result = new Byte[1];
-            int expectedTries = 5;
+            int expectedTries = 2;
             int tries = 0;
             bool failed = false;
 
