@@ -33,8 +33,10 @@ namespace tretton37uppgift
             //Ensure downloadfolder exists
             Directory.CreateDirectory(downloadFolderPath);
 
+            //Start downloading
             await DownloadPage(rootURL);
 
+            //Done
             downloadedURLs.CompleteAdding();
         }
 
@@ -69,11 +71,11 @@ namespace tretton37uppgift
             string relativePath = new Uri(rootURL).MakeRelativeUri(new Uri(URL)).ToString();
             string filepath = Path.Combine(downloadFolderPath, relativePath);
             string? fileDirectory = Path.GetDirectoryName(filepath);
-            if (fileDirectory is not null)
+            if (fileDirectory is not null && fileDirectory != String.Empty)
                 Directory.CreateDirectory(fileDirectory);
             else
                 return;
-            Directory.CreateDirectory(fileDirectory);
+            
             // Write HTML file to disk
             string htmlFileName = Path.Combine(fileDirectory, Path.GetFileName(URL));
             lock (lockingObject)
@@ -83,17 +85,18 @@ namespace tretton37uppgift
                     f.Write(new UTF8Encoding().GetBytes(htmlContent));
                 }
             }
+
             //Download images and other static files
             DownloadResources(URL, htmlDocument, httpClient, "//img[@src]");
             DownloadResources(URL, htmlDocument, httpClient, "//link[@rel='stylesheet' or @rel='icon']/@href");
             DownloadResources(URL, htmlDocument, httpClient, "//script[@src]/@src");
 
-            // Find and follow links to other pages
+            // Find and follow linksToProcess to other pages
             var linkNodes = htmlDocument.DocumentNode.SelectNodes("//a[@href]");
 
             if (linkNodes != null)
             {
-                List<Task> links = new List<Task>();
+                List<Task> linksToProcess = new List<Task>();
                 foreach (var linkNode in linkNodes)
                 {
                     string nextUrl = linkNode.Attributes["href"].Value;
@@ -101,7 +104,7 @@ namespace tretton37uppgift
                     // Check if the link is an absolute URL or a relative path
                     if (Uri.TryCreate(nextUrl, UriKind.Absolute, out Uri? absoluteUri))
                     {
-                        //No external links
+                        //No external linksToProcess
                         if (absoluteUri.Host != rootUri.Host)
                             continue;
                         // If it's an absolute URL, use it as is
@@ -119,11 +122,11 @@ namespace tretton37uppgift
                     }
                     else
                     {
-                        links.Add(Task.Run(() => DownloadPage(nextUrl)));
+                        linksToProcess.Add(Task.Run(() => DownloadPage(nextUrl)));
                     }
                 }
 
-                await Task.WhenAll(links);
+                await Task.WhenAll(linksToProcess);
 
             }
         }
@@ -157,7 +160,7 @@ namespace tretton37uppgift
                         string resourceRelativePath = new Uri(rootURL).MakeRelativeUri(new Uri(resourceUrl)).ToString();
                         string resourceCombinedPath = Path.Combine(downloadFolderPath, resourceRelativePath);
                         string? resourceDirectory = Path.GetDirectoryName(resourceCombinedPath);
-                        if (resourceDirectory is not null)
+                        if (resourceDirectory is not null && resourceDirectory != String.Empty)
                             Directory.CreateDirectory(resourceDirectory);
                         else
                             continue;

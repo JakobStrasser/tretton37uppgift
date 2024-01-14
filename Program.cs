@@ -16,7 +16,6 @@ var builder = CoconaApp.CreateBuilder();
 
 builder.Logging.AddFilter("System.Net.Http", LogLevel.Warning);
 
-builder.Services.AddHttpClient();
 builder.Services.AddSingleton<IWebSiteDownloader, WebSiteDownloader>();
 
 var app = builder.Build();
@@ -37,7 +36,7 @@ app.AddCommand("download", async ([Option("u", Description = @"URL to download (
     }
 
     Console.WriteLine();
-    Console.WriteLine($"Download a total of {downloader.Count} pages.");
+    Console.WriteLine($"Downloaded a total of {downloader.Count} pages.");
     Console.WriteLine("Press Enter to exit.");
     Console.ReadLine();
 });
