@@ -21,18 +21,21 @@ builder.Services.AddSingleton<IWebSiteDownloader, WebSiteDownloader>();
 
 var app = builder.Build();
 
-app.AddCommand("download", async ([Option] string? URL, [Option] string? downloadfolder, IWebSiteDownloader downloader) =>  {
-    string rootURL = URL ??  @"http://books.toscrape.com/index.html";
-    string downloadFolderPath = downloadfolder ??  @"C:\temp\bookstoscrapecom\";
+app.AddCommand("download", async ([Option] string? URL, [Option] string? downloadfolder, IWebSiteDownloader downloader) =>
+{
+    string rootURL = URL ?? @"http://quotes.toscrape.com";
+    string downloadFolderPath = downloadfolder ?? @"C:\temp\quotestoscrapecom\";
 
     Console.WriteLine($"Downloading {rootURL} to {downloadFolderPath}");
     try
     {
         await downloader.StartDownload(rootURL, downloadFolderPath);
     }
-    catch (Exception ex) {
+    catch (Exception ex)
+    {
         Console.WriteLine($"Program failed: {ex.Message}");
     }
+
     Console.WriteLine();
     Console.WriteLine($"Download a total of {downloader.Count} pages.");
     Console.WriteLine("Press Enter to exit.");

@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace tretton37uppgift
 {
-    internal class WebSiteDownloader : IWebSiteDownloader
+    partial class WebSiteDownloader : IWebSiteDownloader
     {
 
         private string rootURL;
@@ -17,13 +17,11 @@ namespace tretton37uppgift
         private int count;
         public int Count { get { return count; } }
         BlockingCollection<string> downloadedURLs = new BlockingCollection<string>();
-        private readonly IHttpClientFactory client;
-
-
         object lockingObject = new object();
-        public WebSiteDownloader(IHttpClientFactory httpClientFactory)
+
+        public WebSiteDownloader()
         {
-            client = httpClientFactory;
+            
         }
 
         public async Task StartDownload(string UrlToDownload, string DownloadPath)
@@ -40,9 +38,9 @@ namespace tretton37uppgift
             downloadedURLs.CompleteAdding();
         }
 
-        async Task DownloadPage(string URL)
+        private async Task DownloadPage(string URL)
         {
-            var httpClient = client.CreateClient();
+            
             //Base case
             if (downloadedURLs.Contains(URL))
             {
@@ -57,7 +55,8 @@ namespace tretton37uppgift
 
             //Recursion
             // Download the HTML content of the current page
-            string htmlContent = await downloadHtml(httpClient, URL, 0);
+            using var httpClient = new HttpClient();
+            string htmlContent = await DownloadHtml(httpClient, URL, 0);
 
             // Parse HTML content
             HtmlDocument htmlDocument = new HtmlDocument();
@@ -129,7 +128,7 @@ namespace tretton37uppgift
             }
         }
 
-        async Task DownloadResources(string url, HtmlDocument htmlDocument, HttpClient httpClient, string xpath)
+        private async Task DownloadResources(string url, HtmlDocument htmlDocument,HttpClient httpClient, string xpath)
         {
             var resourceNodes = htmlDocument.DocumentNode.SelectNodes(xpath);
             if (resourceNodes != null)
@@ -163,8 +162,8 @@ namespace tretton37uppgift
                         else
                             continue;
                         string resourceFileName = Path.Combine(resourceDirectory, Path.GetFileName(resourceUrl));
-
-                        byte[] resourceData = await downloadResource(httpClient, resourceUrl, 0);
+                       
+                        byte[] resourceData = await DownloadResource(httpClient, resourceUrl, 0);
                         lock (lockingObject)
                         {
                             using (var f = new FileStream(resourceFileName, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None))
@@ -180,7 +179,7 @@ namespace tretton37uppgift
 
         }
 
-        private static async Task<byte[]> downloadResource(HttpClient httpClient, string resourceUrl, int retry)
+        protected static async Task<byte[]> DownloadResource(HttpClient httpClient, string resourceUrl, int retry)
         {
             byte[] resourceData = new byte[1];
             try
@@ -193,19 +192,20 @@ namespace tretton37uppgift
                 if (retry < 5)
                 {
                     Console.WriteLine($"Error when downloading {resourceUrl} retrying attempt ${++retry}");
-                    await downloadResource(httpClient, resourceUrl, retry);
+                    await DownloadResource(httpClient, resourceUrl, retry);
                 }
                 else
                 {
                     Console.WriteLine($"Error when downloading {resourceUrl} stopping program!");
-                    throw new Exception($"Error when downloading {resourceUrl} stopping program!", ex);
+                    var innerException =  new Exception($"Error when downloading {resourceUrl} stopping program!", ex);
+                    throw new DownloadFailedException(5, innerException);
                 }
             }
 
             return resourceData;
         }
 
-        private static async Task<string> downloadHtml(HttpClient httpClient, string Url, int retry)
+        protected static async Task<string> DownloadHtml(HttpClient httpClient, string Url, int retry)
         {
             string data = "";
             try
@@ -218,12 +218,13 @@ namespace tretton37uppgift
                 if (retry < 5)
                 {
                     Console.WriteLine($"Error when downloading {Url} retrying attempt ${++retry}");
-                    await downloadResource(httpClient, Url, retry);
+                    await DownloadHtml(httpClient, Url, retry);
                 }
                 else
                 {
                     Console.WriteLine($"Error when downloading {Url} stopping program!");
-                    throw new Exception($"Error when downloading {Url} stopping program!", ex);
+                    var innerException = new Exception($"Error when downloading {Url} stopping program!", ex);
+                    throw new DownloadFailedException(5, innerException);
                 }
             }
 
