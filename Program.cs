@@ -26,9 +26,13 @@ app.AddCommand("download", async ([Option] string? URL, [Option] string? downloa
     string downloadFolderPath = downloadfolder ??  @"C:\temp\bookstoscrapecom\";
 
     Console.WriteLine($"Downloading {rootURL} to {downloadFolderPath}");
-
-    await downloader.StartDownload(rootURL, downloadFolderPath);
-
+    try
+    {
+        await downloader.StartDownload(rootURL, downloadFolderPath);
+    }
+    catch (Exception ex) {
+        Console.WriteLine($"Program failed: {ex.Message}");
+    }
     Console.WriteLine();
     Console.WriteLine($"Download a total of {downloader.Count} pages.");
     Console.WriteLine("Press Enter to exit.");
