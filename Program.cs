@@ -21,10 +21,10 @@ builder.Services.AddSingleton<IWebSiteDownloader, WebSiteDownloader>();
 
 var app = builder.Build();
 
-app.AddCommand("download", async ([Option] string? URL, [Option] string? downloadfolder, IWebSiteDownloader downloader) =>
+app.AddCommand("download", async ([Option("u", Description = @"URL to download (default: http://books.toscrape.com/index.html)")] string? URL, [Option("o", Description = @"Output folder (default: current directory)")] string? downloadfolder, IWebSiteDownloader downloader) =>
 {
-    string rootURL = URL ?? @"http://quotes.toscrape.com";
-    string downloadFolderPath = downloadfolder ?? @"C:\temp\quotestoscrapecom\";
+    string rootURL = URL ?? @"http://books.toscrape.com/index.html";
+    string downloadFolderPath = downloadfolder ?? @".\booksstoscrapecom\";
 
     Console.WriteLine($"Downloading {rootURL} to {downloadFolderPath}");
     try
