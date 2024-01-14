@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace tretton37uppgift
 {
-    internal class WebSiteDownloader
+    internal class WebSiteDownloader : IWebSiteDownloader
     {
 
         private string rootURL;
@@ -16,12 +16,18 @@ namespace tretton37uppgift
         private string downloadFolderPath;
         private int count;
         public int Count { get { return count; } }
-        HashSet<string> downloadedURLs = new HashSet<string>();
+        BlockingCollection<string> downloadedURLs = new BlockingCollection<string>();
+        private readonly IHttpClientFactory client;
 
-       
-       
+
         object lockingObject = new object();
-        public WebSiteDownloader(string UrlToDownload, string DownloadPath )
+        public WebSiteDownloader(IHttpClientFactory httpClientFactory)
+        {
+            client = httpClientFactory;
+          
+        }
+
+        public async Task StartDownload(string UrlToDownload, string DownloadPath)
         {
             count = 0;
             rootURL = UrlToDownload;
@@ -30,16 +36,12 @@ namespace tretton37uppgift
             //Ensure downloadfolder exists
             Directory.CreateDirectory(downloadFolderPath);
 
-           
+            await DownloadPage(rootURL);
         }
 
-        public async Task StartDownload()
+        async Task DownloadPage(string URL)
         {
-            using HttpClient httpClient = new HttpClient();
-            await DownloadPage(rootURL, httpClient);
-        }
-async Task DownloadPage(string URL, HttpClient httpClient)
-        {
+            var httpClient = client.CreateClient();
             //Base case
             if (downloadedURLs.Contains(URL))
             {
@@ -117,7 +119,7 @@ async Task DownloadPage(string URL, HttpClient httpClient)
                     }
                     else
                     {
-                        links.Add(Task.Run(() => DownloadPage(nextUrl, httpClient)));
+                        links.Add(Task.Run(() => DownloadPage(nextUrl)));
                     }
                 }
 

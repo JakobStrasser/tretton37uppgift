@@ -7,17 +7,32 @@ using System.Text;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
 using tretton37uppgift;
+using Cocona;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
-string rootURL = @"http://books.toscrape.com/index.html";
-string downloadFolderPath = @"C:\temp\bookstoscrapecom\";
 
-Console.WriteLine($"Downloading {rootURL} to {downloadFolderPath}");
+var builder = CoconaApp.CreateBuilder();
 
-var downloader = new WebSiteDownloader(rootURL, downloadFolderPath);
+builder.Logging.AddFilter("System.Net.Http", LogLevel.Warning);
 
-await downloader.StartDownload();
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<IWebSiteDownloader, WebSiteDownloader>();
 
-Console.WriteLine();
-Console.WriteLine($"Download a total of {downloader.Count} pages.");
-Console.WriteLine("Press Enter to exit.");
-Console.ReadLine();
+var app = builder.Build();
+
+app.AddCommand("download", async ([Option] string? URL, [Option] string? downloadfolder, IWebSiteDownloader downloader) =>  {
+    string rootURL = URL ??  @"http://books.toscrape.com/index.html";
+    string downloadFolderPath = downloadfolder ??  @"C:\temp\bookstoscrapecom\";
+
+    Console.WriteLine($"Downloading {rootURL} to {downloadFolderPath}");
+
+    await downloader.StartDownload(rootURL, downloadFolderPath);
+
+    Console.WriteLine();
+    Console.WriteLine($"Download a total of {downloader.Count} pages.");
+    Console.WriteLine("Press Enter to exit.");
+    Console.ReadLine();
+});
+
+app.Run();
