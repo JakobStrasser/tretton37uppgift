@@ -16,9 +16,9 @@ The objective was to write a website scraper that would replicate the file struc
 
 Thee application should do the following:
 
-● Recursively traverses all pages on https://books.toscrape.com/
-● Downloads and saves all files (pages, images...) to disk while keeping the file structure
-● Shows some kind of progress information in the console
+*  Recursively traverses all pages on https://books.toscrape.com/
+*  Downloads and saves all files (pages, images...) to disk while keeping the file structure
+*  Shows some kind of progress information in the console
 
 I first wrote the recursive algorithm that downloads the website and follows all internal links, as well as saves static resources like images. Then I ensured that saving to disk works.
 Next was adding async/await as well as anonymous functions for parallelism.
