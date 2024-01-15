@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "tretton37uppgift": {
+      "commandName": "Project",
+      "commandLineArgs": "download"
+    }
+  }
+}
