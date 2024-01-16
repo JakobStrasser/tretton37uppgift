@@ -25,6 +25,6 @@ Next was adding async/await as well as anonymous functions for parallelism.
 
 A while ago I saw a youtube video about a CLI package, Cocona, that makes console applications run like web applications in .net with a host so added that in to try it out.
 
-There was no easy unit tests to do since the application was one big recursive function so broke out the download function and wrote a unit test for that as well as handling retries on timeouts or other request-issues.
+There was no easy unit tests to do since the application was one big recursive function so broke out the download function and wrote a unit test for that as well as handling retries on timeouts or other errors.
 
 Testing had to be put in a partial class because of the CLI package. So I did not use the recommended pattern of dependency injection of a HttpClientFactory.

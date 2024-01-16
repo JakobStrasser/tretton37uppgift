@@ -5,6 +5,6 @@ namespace tretton37uppgift
     {
         int Count { get; }
 
-        Task StartDownload(string UrlToDownload, string DownloadPath);
+        Task StartDownload(string UrlToDownload, string DownloadPath, int? MaxRetries = 5);
     }
 }

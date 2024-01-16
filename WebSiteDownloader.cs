@@ -15,6 +15,7 @@ namespace tretton37uppgift
         private Uri rootUri;
         private string downloadFolderPath;
         private int count;
+        private static int MaxRetries { get; set; } = 5;
         public int Count { get { return count; } }
         BlockingCollection<string> downloadedURLs = new BlockingCollection<string>();
         object lockingObject = new object();
@@ -24,9 +25,10 @@ namespace tretton37uppgift
 
         }
 
-        public async Task StartDownload(string UrlToDownload, string DownloadPath)
+        public async Task StartDownload(string UrlToDownload, string DownloadPath, int? maxRetries)
         {
             count = 0;
+            MaxRetries = maxRetries ?? 5;
             rootURL = UrlToDownload;
             rootUri = new Uri(rootURL);
             downloadFolderPath = DownloadPath;
@@ -58,7 +60,7 @@ namespace tretton37uppgift
             //Recursion
             // Download the HTML content of the current page
             using var httpClient = new HttpClient();
-            byte[] htmlBytes = DownloadResource(httpClient, URL, 5);
+            byte[] htmlBytes = DownloadResource(httpClient, URL);
             string htmlContent = System.Text.Encoding.UTF8.GetString(htmlBytes);
             // Parse HTML content
             HtmlDocument htmlDocument = new HtmlDocument();
@@ -166,7 +168,7 @@ namespace tretton37uppgift
                             continue;
                         string resourceFileName = Path.Combine(resourceDirectory, Path.GetFileName(resourceUrl));
 
-                        byte[] resourceData = DownloadResource(httpClient, resourceUrl, 5);
+                        byte[] resourceData = DownloadResource(httpClient, resourceUrl);
                         lock (lockingObject)
                         {
                             using (var f = new FileStream(resourceFileName, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None))
@@ -182,11 +184,11 @@ namespace tretton37uppgift
 
         }
 
-        protected static byte[] DownloadResource(HttpClient httpClient, string resourceUrl, int maxtries)
+        protected static byte[] DownloadResource(HttpClient httpClient, string resourceUrl)
         {
             int tries = 0;
 
-            while (tries < maxtries)
+            while (tries < MaxRetries)
             {
                 tries++;
                 try
@@ -201,10 +203,10 @@ namespace tretton37uppgift
                 }
                 catch (Exception ex)
                 { 
-                    Console.WriteLine($"Error when downloading {resourceUrl} on attempt {tries} of {maxtries}."); 
+                    Console.WriteLine($"Error when downloading {resourceUrl} on attempt {tries} of {MaxRetries}."); 
                 }
             }
-            throw new DownloadFailedException(tries, new Exception($"Failed after reaching retry limit of {maxtries}."));
+            throw new DownloadFailedException(tries, new Exception($"Failed after reaching retry limit of {MaxRetries}."));
 
         }
 

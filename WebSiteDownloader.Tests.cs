@@ -18,24 +18,21 @@ namespace tretton37uppgift
         {
             var expectedresult = File.ReadAllBytes("TestResource.jpg");
             byte[] result = new byte[1];
-            int expectedTries = 0;
-            int tries = 0;
             bool failed = false;
 
 
             try
             {
-                result =  DownloadResource(new HttpClient(), @"http://books.toscrape.com/media/cache/00/08/0008e65aa431ed3625ad3a4352f8e90d.jpg", 5);
+                result =  DownloadResource(new HttpClient(), @"http://books.toscrape.com/media/cache/00/08/0008e65aa431ed3625ad3a4352f8e90d.jpg");
             }
             catch (DownloadFailedException ex)
             {
                 failed = true;
-                tries = ex.Retries;
             }
 
             //assert
             Assert.Equal(expectedresult, result);
-            Assert.Equal(expectedTries, tries);
+           
             Assert.False(failed);
 
         }
@@ -46,14 +43,14 @@ namespace tretton37uppgift
             //arrange
             var expectedresult = new Byte[1];
             var result = new Byte[1];
-            int expectedTries = 2;
+            MaxRetries = 2;
             int tries = 0;
             bool failed = false;
 
             //act
             try
             {
-                result = DownloadResource(new HttpClient(), "http://localhost", 2);
+                result = DownloadResource(new HttpClient(), "http://localhost");
             }
             catch (DownloadFailedException ex) 
             { 
@@ -63,7 +60,7 @@ namespace tretton37uppgift
 
             //assert
             Assert.Equal(expectedresult, result);
-            Assert.Equal(expectedTries, tries);
+            Assert.Equal(MaxRetries, tries);
             Assert.True(failed);
         }
 
